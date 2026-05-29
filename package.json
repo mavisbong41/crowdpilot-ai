@@ -1,0 +1,12 @@
+{
+  "name": "crowdpilot-ai",
+  "private": true,
+  "version": "0.1.0",
+  "description": "CrowdPilot AI — multi-agent event operations platform",
+  "scripts": {
+    "dev:frontend": "npm run dev --prefix frontend",
+    "dev:backend": "cd backend && uvicorn main:app --reload --host 0.0.0.0 --port 8000",
+    "install:frontend": "npm install --prefix frontend",
+    "install:backend": "cd backend && pip install -r requirements.txt"
+  }
+}
