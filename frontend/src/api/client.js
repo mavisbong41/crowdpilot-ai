@@ -21,4 +21,8 @@ export const api = {
   listEvents: () => request("/api/events"),
   getPlan: (planId) => request(`/api/plans/${planId}`),
   listPlansForEvent: (eventId) => request(`/api/plans/event/${eventId}`),
+  coordinate: (payload) =>
+    request("/api/agents/coordinate", { method: "POST", body: JSON.stringify(payload) }),
+  coordinateAndSave: (payload) =>
+    request("/api/agents/coordinate/save", { method: "POST", body: JSON.stringify(payload) }),
 };

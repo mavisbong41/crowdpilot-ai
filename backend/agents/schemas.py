@@ -84,6 +84,14 @@ class CoordinatorInput(BaseModel):
     venue_capacity: int = Field(..., ge=1)
     incident_data: list[IncidentDataItem] = Field(default_factory=list)
     event_name: str | None = Field(default=None, max_length=200)
+    mission_goal: str | None = Field(
+        default=None,
+        max_length=600,
+        description="Operator objective the agent should plan and execute toward.",
+    )
+    venue: str | None = Field(default=None, max_length=200)
+    weather_condition: str | None = Field(default=None, max_length=120)
+    time_window: str | None = Field(default=None, max_length=120)
 
 
 class AgentPipelineOutputs(BaseModel):
@@ -92,9 +100,22 @@ class AgentPipelineOutputs(BaseModel):
     incidents: IncidentAgentOutput
 
 
+class PartnerToolCall(BaseModel):
+    partner: str = "MongoDB"
+    mcp_server: str = "mongodb/mongodb-mcp-server"
+    tool: str
+    purpose: str
+    status: Literal["planned", "executed", "simulated"]
+    collection: str | None = None
+
+
 class CoordinatedOperationPlan(BaseModel):
     risk_level: RiskLevel
     recommendations: list[str]
+    mission_summary: str
+    execution_steps: list[str]
+    success_metrics: list[str]
+    partner_tool_calls: list[PartnerToolCall] = Field(default_factory=list)
     generated_at: datetime = Field(default_factory=utc_now)
 
 
