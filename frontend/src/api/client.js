@@ -25,4 +25,24 @@ export const api = {
     request("/api/agents/coordinate", { method: "POST", body: JSON.stringify(payload) }),
   coordinateAndSave: (payload) =>
     request("/api/agents/coordinate/save", { method: "POST", body: JSON.stringify(payload) }),
+  startMission: (payload) =>
+    request("/api/mission/start", { method: "POST", body: JSON.stringify(payload) }),
+  getMission: (missionId) => request(`/api/mission/${missionId}`),
+  decideAction: (missionId, actionIndex, decision) =>
+    request(`/api/mission/${missionId}/actions/${actionIndex}/decision`, {
+      method: "POST",
+      body: JSON.stringify({ decision }),
+    }),
 };
+
+export function missionWebSocketUrl(missionId) {
+  const configuredBase = import.meta.env.VITE_API_BASE_URL;
+  if (configuredBase) {
+    const url = new URL(configuredBase, window.location.origin);
+    const protocol = url.protocol === "https:" ? "wss:" : "ws:";
+    return `${protocol}//${url.host}/api/mission/ws/${missionId}`;
+  }
+
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  return `${protocol}//${window.location.host}/api/mission/ws/${missionId}`;
+}

@@ -9,7 +9,7 @@ from agents.exceptions import AgentError, GeminiServiceError
 from config import settings
 from logging_config import setup_logging
 from database.connection import close_db, connect_db
-from routes import agents, events, health, incidents, plans
+from routes import agents, events, health, incidents, missions, plans
 
 setup_logging()
 
@@ -63,3 +63,4 @@ app.include_router(events.router, prefix="/api/events", tags=["events"])
 app.include_router(incidents.router, prefix="/api/incidents", tags=["incidents"])
 app.include_router(plans.router, prefix="/api/plans", tags=["operation_plans"])
 app.include_router(agents.router, prefix="/api/agents", tags=["agents"])
+app.include_router(missions.router, prefix="/api/mission", tags=["missions"])

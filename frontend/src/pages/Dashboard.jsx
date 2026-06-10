@@ -1,403 +1,546 @@
-import { useMemo, useState } from "react";
-import { api } from "../api/client.js";
+import { useEffect, useMemo, useRef, useState } from "react";
+import AgentPipeline from "../components/AgentPipeline.jsx";
+import { api, missionWebSocketUrl } from "../api/client.js";
 import {
   IconActivity,
   IconAlert,
-  IconBuilding,
   IconCheck,
-  IconDatabase,
   IconPlay,
   IconRadar,
   IconRoute,
   IconUsers,
 } from "../components/icons.jsx";
 
-const initialMission = {
-  event_name: "World Cup 2026 Fan Zone - Downtown Plaza",
-  venue: "Downtown Plaza, Gate A/B corridor",
-  mission_goal:
-    "Prevent entry bottlenecks, keep medical response under 8 minutes, and generate an operator-approved crowd plan before the evening surge.",
-  expected_attendance: 42500,
-  venue_capacity: 50000,
-  weather_condition: "Humid, 31C, light wind",
-  time_window: "18:00-22:30",
-  incident_data: [
-    {
-      id: "INC-1042",
-      location: "Gate A main ingress",
-      severity: "high",
-      description: "Queue depth exceeds 400m and wait time is trending above 35 minutes.",
-      status: "open",
-    },
-    {
-      id: "INC-1041",
-      location: "Stage Front Zone 2",
-      severity: "medium",
-      description: "Density approaching 4.5 persons per square meter near the sponsor stage.",
-      status: "in_progress",
-    },
-    {
-      id: "INC-1039",
-      location: "East medical tent",
-      severity: "low",
-      description: "Heat-related assistance requests are 18% above baseline.",
-      status: "open",
-    },
-  ],
-};
-
-const fallbackResult = {
-  agents: {
-    forecast: {
-      crowd_risk_level: "high",
-      utilization_ratio: 0.85,
-      congestion_zones: [
-        { zone: "Gate A", level: "critical", reason: "Queue depth and ingress rate exceed safe flow." },
-        { zone: "Stage Front Zone 2", level: "high", reason: "Static crowd density is rising near stage." },
-        { zone: "Transit Exit", level: "moderate", reason: "Departure wave expected after final whistle." },
-      ],
-    },
-    resources: {
-      recommended_security_staff: 92,
-      recommended_traffic_controllers: 28,
-      recommended_medical_staff: 18,
-    },
-    incidents: {
-      response_actions: [
-        {
-          incident_ref: "INC-1042",
-          location: "Gate A main ingress",
-          priority: "high",
-          action: "Open auxiliary lanes, throttle scans, and deploy supervisors to the queue terminus.",
-        },
-        {
-          incident_ref: "INC-1041",
-          location: "Stage Front Zone 2",
-          priority: "medium",
-          action: "Create a lateral release path and move roaming staff to the sponsor stage edge.",
-        },
-      ],
-    },
+const eventOptions = [
+  {
+    id: "world-cup-final",
+    name: "World Cup Final 2026",
+    venue: "National Stadium",
+    attendance: 80000,
+    capacity: 88000,
+    focus: "Crowd Safety",
+    weather: "Clear, 28C",
+    timeWindow: "17:00-23:30",
+    mission:
+      "Protect ingress and egress flow, detect critical crowd density early, and generate operator-approved mitigation actions.",
+    incidents: [
+      {
+        id: "INC-1042",
+        location: "Zone A - Gate B",
+        severity: "high",
+        description: "Arrival rate is exceeding gate throughput and queue density is rising.",
+        status: "open",
+      },
+      {
+        id: "INC-1041",
+        location: "North Concourse",
+        severity: "medium",
+        description: "Pedestrian flow is converging near food and merchandise areas.",
+        status: "in_progress",
+      },
+    ],
   },
-  operation_plan: {
-    risk_level: "high",
-    mission_summary:
-      "CrowdPilot planned a supervised multi-step response for World Cup 2026 Fan Zone using MongoDB partner tools as operational memory.",
-    recommendations: [
-      "Maintain HIGH posture for the fan zone with hourly operator review.",
-      "Open Gate C overflow lanes before the 18:30 arrival wave.",
-      "Deploy 92 security staff, 28 traffic controllers, and 18 medical staff.",
-      "[Gate A main ingress] Open auxiliary lanes and dispatch queue supervisors.",
-      "[Stage Front Zone 2] Create a lateral release path and rebalance roaming staff.",
-    ],
-    execution_steps: [
-      "Read event profile, active incidents, and prior plans from MongoDB.",
-      "Forecast utilization and identify congestion zones.",
-      "Calculate staffing levels from risk, capacity, and active incident severity.",
-      "Convert incidents into prioritized field actions.",
-      "Persist the plan for supervisor approval and demo replay.",
-    ],
-    success_metrics: [
-      "Supervisor can approve or edit the plan before field dispatch.",
-      "Keep venue utilization below 92% during 18:00-22:30.",
-      "Reduce high-severity incident response time to under 8 minutes.",
-      "Maintain a complete MongoDB audit trail for event, incident, and plan updates.",
-    ],
-    partner_tool_calls: [
+  {
+    id: "fan-zone",
+    name: "City Fan Zone Final",
+    venue: "Downtown Event Plaza",
+    attendance: 42500,
+    capacity: 50000,
+    focus: "Surge Management",
+    weather: "Humid, 31C",
+    timeWindow: "18:00-22:30",
+    mission:
+      "Prevent entry bottlenecks, keep medical response under 8 minutes, and prepare the venue for the evening surge.",
+    incidents: [
       {
-        partner: "MongoDB",
-        mcp_server: "mongodb/mongodb-mcp-server",
-        tool: "find",
-        collection: "events, incidents",
-        status: "executed",
-        purpose: "Load event profile and active incidents for the coordinator mission.",
+        id: "INC-2042",
+        location: "Main Ingress",
+        severity: "high",
+        description: "Queue depth exceeds 400m and wait time is trending above 35 minutes.",
+        status: "open",
       },
       {
-        partner: "MongoDB",
-        mcp_server: "mongodb/mongodb-mcp-server",
-        tool: "aggregate",
-        collection: "events",
-        status: "executed",
-        purpose: "Compare attendance, capacity, and incident severity signals.",
-      },
-      {
-        partner: "MongoDB",
-        mcp_server: "mongodb/mongodb-mcp-server",
-        tool: "insertOne",
-        collection: "operation_plans",
-        status: "planned",
-        purpose: "Save generated operation plan for human approval and demo replay.",
+        id: "INC-2041",
+        location: "Stage Front",
+        severity: "medium",
+        description: "Static density is increasing near the sponsor stage.",
+        status: "in_progress",
       },
     ],
-    generated_at: new Date().toISOString(),
   },
-};
+  {
+    id: "mall-launch",
+    name: "Retail Launch Weekend",
+    venue: "Harbor Mall Atrium",
+    attendance: 18600,
+    capacity: 24000,
+    focus: "Shopper Flow",
+    weather: "Indoor venue",
+    timeWindow: "12:00-20:00",
+    mission:
+      "Balance shopper flow, prevent vertical transport choke points, and issue coordinated tenant and security actions.",
+    incidents: [
+      {
+        id: "INC-3042",
+        location: "West Escalators",
+        severity: "high",
+        description: "Two escalators are offline and crowd dwell time is increasing.",
+        status: "open",
+      },
+    ],
+  },
+];
 
-const riskColors = {
-  low: "text-emerald-700 bg-emerald-50 border-emerald-200",
-  medium: "text-amber-700 bg-amber-50 border-amber-200",
-  high: "text-orange-700 bg-orange-50 border-orange-200",
-  critical: "text-rose-700 bg-rose-50 border-rose-200",
-};
+const agents = [
+  {
+    id: "coordinator",
+    name: "Coordinator Agent",
+    role: "Mission orchestration and context",
+    thought: "Waiting for mission execution...",
+  },
+  {
+    id: "forecast",
+    name: "Crowd Forecast Agent",
+    role: "Crowd flow and density prediction",
+    thought: "Waiting for coordinator context...",
+  },
+  {
+    id: "risk",
+    name: "Risk Analysis Agent",
+    role: "Congestion and bottleneck analysis",
+    thought: "Waiting for forecast results...",
+  },
+  {
+    id: "resource",
+    name: "Resource Planner Agent",
+    role: "Security and response allocation",
+    thought: "Waiting for risk analysis...",
+  },
+  {
+    id: "action",
+    name: "Action Generation Agent",
+    role: "Approval-ready response plans",
+    thought: "Waiting for resource plan...",
+  },
+];
 
-function Field({ label, children }) {
-  return (
-    <label className="block">
-      <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</span>
-      {children}
-    </label>
-  );
+const initialAgentState = Object.fromEntries(
+  agents.map((agent) => [
+    agent.id,
+    { status: "waiting", thought: agent.thought },
+  ]),
+);
+
+const agentLabel = Object.fromEntries(agents.map((agent) => [agent.id, agent.name]));
+
+function formatTime(timestamp) {
+  return new Intl.DateTimeFormat("en", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(timestamp ? new Date(timestamp) : new Date());
 }
 
-function inputClass() {
-  return "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20";
-}
+function StatusBadge({ status }) {
+  const styles = {
+    ready: "border-slate-200 bg-slate-100 text-slate-600",
+    running: "border-blue-200 bg-blue-50 text-blue-700",
+    completed: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    failed: "border-red-200 bg-red-50 text-red-700",
+  };
 
-function Metric({ icon: Icon, label, value, detail }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-start gap-3">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
-          <Icon className="h-4 w-4" />
-        </span>
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-          <p className="mt-1 text-2xl font-bold text-slate-950">{value}</p>
-          <p className="mt-1 text-sm text-slate-600">{detail}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Panel({ title, icon: Icon, children, aside }) {
-  return (
-    <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
-      <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-5 py-4">
-        <div className="flex items-center gap-3">
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-50 text-teal-700">
-            <Icon className="h-4 w-4" />
-          </span>
-          <h2 className="text-sm font-bold uppercase tracking-wide text-slate-800">{title}</h2>
-        </div>
-        {aside}
-      </div>
-      <div className="p-5">{children}</div>
-    </section>
-  );
-}
-
-function RiskBadge({ level }) {
-  const normalized = level || "medium";
-  return (
-    <span className={`rounded-full border px-3 py-1 text-xs font-bold uppercase ${riskColors[normalized] || riskColors.medium}`}>
-      {normalized}
+    <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[10px] font-black uppercase ${styles[status] || styles.ready}`}>
+      <span className={`h-2 w-2 rounded-full ${status === "running" ? "bg-blue-500" : status === "completed" ? "bg-emerald-500" : status === "failed" ? "bg-red-500" : "bg-slate-400"}`} />
+      {status}
     </span>
   );
 }
 
-export default function Dashboard() {
-  const [mission, setMission] = useState(initialMission);
-  const [result, setResult] = useState(fallbackResult);
-  const [isRunning, setIsRunning] = useState(false);
-  const [mode, setMode] = useState("demo");
-  const [error, setError] = useState("");
+function OperationalView({ forecast, status }) {
+  const zones = forecast?.congestion_zones || [];
+  const critical = zones.find((zone) => zone.level === "critical") || zones[0];
+  const density = forecast ? Math.round(forecast.utilization_ratio * 100) : 0;
 
-  const utilization = useMemo(() => {
-    const ratio = result?.agents?.forecast?.utilization_ratio ?? mission.expected_attendance / mission.venue_capacity;
-    return Math.round(ratio * 100);
-  }, [mission.expected_attendance, mission.venue_capacity, result]);
+  return (
+    <section className="h-full min-h-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="mb-3 flex items-center justify-between">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-blue-700">Operational visualization</p>
+          <h2 className="text-base font-black text-slate-950">Venue Density Forecast</h2>
+        </div>
+        <span className="text-[10px] font-bold uppercase text-slate-500">{status === "running" ? "Live prediction" : "Current view"}</span>
+      </div>
 
-  const plan = result.operation_plan;
-  const forecast = result.agents.forecast;
-  const resources = result.agents.resources;
-  const actions = result.agents.incidents.response_actions;
+      <div className="grid h-[calc(100%-46px)] min-h-[260px] grid-cols-[minmax(0,1fr)_112px] gap-3">
+        <div className="relative h-full overflow-hidden rounded-md border border-slate-200 bg-slate-50">
+          <div className="absolute inset-[14%_9%] rounded-[42%] border-[18px] border-emerald-200 bg-emerald-100" />
+          <div className="absolute inset-[20%_14%] rounded-[42%] border-[18px] border-yellow-200 bg-yellow-100" />
+          <div className="absolute inset-[27%_20%] rounded-[40%] border-[15px] border-orange-300 bg-orange-100" />
+          <div className={`absolute inset-[34%_28%] rounded-[34%] border-[12px] ${density >= 85 ? "border-red-400 bg-red-100" : density ? "border-orange-300 bg-orange-50" : "border-slate-200 bg-white"}`} />
+          <div className="absolute inset-[40%_34%] rounded-md border border-emerald-300 bg-emerald-500/70" />
+          {["A1", "B1", "C1"].map((zone, index) => (
+            <span
+              key={zone}
+              className="absolute rounded-md border border-slate-200 bg-white px-2 py-1 text-[10px] font-black shadow-sm"
+              style={{
+                left: `${43 + index * 8}%`,
+                top: `${20 + index * 25}%`,
+              }}
+            >
+              {zone}
+            </span>
+          ))}
+          <span className="absolute left-1/2 top-2 -translate-x-1/2 rounded-md border border-slate-200 bg-white px-2 py-1 text-[9px] font-black">GATE A</span>
+          <span className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-md border border-slate-200 bg-white px-2 py-1 text-[9px] font-black">GATE C</span>
+          <span className="absolute left-2 top-1/2 -translate-y-1/2 rounded-md border border-slate-200 bg-white px-2 py-1 text-[9px] font-black">GATE D</span>
+          <span className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md border border-slate-200 bg-white px-2 py-1 text-[9px] font-black">GATE B</span>
+        </div>
 
-  function updateField(field, value) {
-    setMission((prev) => ({ ...prev, [field]: value }));
+        <div className="space-y-2">
+          <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+            <p className="text-[9px] font-bold uppercase text-slate-500">Predicted density</p>
+            <p className={`mt-1 text-2xl font-black ${density >= 85 ? "text-red-600" : "text-slate-950"}`}>{density ? `${density}%` : "--"}</p>
+          </div>
+          <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+            <p className="text-[9px] font-bold uppercase text-slate-500">Critical zone</p>
+            <p className="mt-1 truncate text-sm font-black text-slate-950">{critical?.zone || "--"}</p>
+          </div>
+          <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+            <p className="text-[9px] font-bold uppercase text-slate-500">Trend</p>
+            <p className="mt-1 text-sm font-black text-slate-950">{density ? "Increasing" : "Awaiting run"}</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ActivityFeed({ items }) {
+  return (
+    <section className="min-h-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="mb-3">
+        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-blue-700">Reason · Plan · Execute</p>
+        <h2 className="text-base font-black text-slate-950">Agent Activity Feed</h2>
+      </div>
+      <div className="max-h-[190px] space-y-1 overflow-auto pr-1 xl:max-h-[calc(100%-44px)]">
+        {items.length === 0 ? (
+          <div className="rounded-md border border-dashed border-slate-300 px-4 py-8 text-center text-xs text-slate-500">
+            Activity appears here after Execute Mission.
+          </div>
+        ) : (
+          items.map((item, index) => (
+            <div key={`${item.timestamp}-${index}`} className="grid grid-cols-[70px_120px_minmax(0,1fr)] gap-2 border-b border-slate-100 px-2 py-2.5 text-xs">
+              <span className="font-mono text-blue-700">{formatTime(item.timestamp)}</span>
+              <span className="truncate font-black text-slate-950">{agentLabel[item.agent] || "Mission Control"}</span>
+              <span className="text-slate-600">{item.message}</span>
+            </div>
+          ))
+        )}
+      </div>
+    </section>
+  );
+}
+
+function MissionSummary({ status, agentState, actions, result }) {
+  const completed = Object.values(agentState).filter((agent) => agent.status === "completed").length;
+  const confidence = actions.length
+    ? Math.round(actions.reduce((sum, action) => sum + action.confidence, 0) / actions.length)
+    : null;
+
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="grid grid-cols-4 gap-2">
+        {[
+          ["Mission status", status],
+          ["Agents completed", `${completed} / ${agents.length}`],
+          ["Actions generated", actions.length],
+          ["Confidence score", confidence ? `${confidence}%` : "--"],
+        ].map(([label, value]) => (
+          <div key={label} className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+            <p className="text-[9px] font-bold uppercase tracking-[0.08em] text-slate-500">{label}</p>
+            <p className="mt-1 truncate text-sm font-black capitalize text-slate-950">{value}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ActionPlans({ missionId, actions, decisions, onDecision }) {
+  async function decide(index, decision) {
+    await api.decideAction(missionId, index, decision);
+    onDecision(index, decision);
   }
 
-  async function runMission() {
-    setIsRunning(true);
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="mb-3 flex items-center justify-between">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-blue-700">Human oversight</p>
+          <h2 className="text-base font-black text-slate-950">Generated Action Plans</h2>
+        </div>
+        <span className="text-[10px] font-bold uppercase text-slate-500">Approval required</span>
+      </div>
+      <div className="grid max-h-[190px] gap-2 overflow-auto pr-1 xl:max-h-[calc(100%-44px)]">
+        {actions.length === 0 ? (
+          <div className="col-span-2 rounded-md border border-dashed border-slate-300 px-4 py-7 text-center text-xs text-slate-500">
+            Approval-ready actions are generated by the final agent.
+          </div>
+        ) : (
+          actions.map((action, index) => {
+            const decision = decisions[index];
+            return (
+              <div key={`${action.incident_ref}-${index}`} className="rounded-md border border-slate-200 bg-slate-50 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase text-blue-700">Action #{index + 1}</p>
+                    <h3 className="mt-1 text-sm font-black text-slate-950">{action.action}</h3>
+                  </div>
+                  <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[9px] font-black text-emerald-700">
+                    {action.confidence}%
+                  </span>
+                </div>
+                <p className="mt-2 text-[11px] text-slate-600"><strong>Reason:</strong> {action.location} requires intervention.</p>
+                <p className="mt-1 text-[11px] text-slate-600"><strong>Impact:</strong> {action.impact}</p>
+                <div className="mt-3 flex gap-2">
+                  <button
+                    type="button"
+                    disabled={Boolean(decision)}
+                    onClick={() => decide(index, "approved")}
+                    className="flex-1 rounded-md bg-slate-950 px-3 py-2 text-[10px] font-black uppercase text-white disabled:opacity-45"
+                  >
+                    {decision === "approved" ? "Approved" : "Approve"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={Boolean(decision)}
+                    onClick={() => decide(index, "rejected")}
+                    className="flex-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[10px] font-black uppercase text-slate-700 disabled:opacity-45"
+                  >
+                    {decision === "rejected" ? "Rejected" : "Reject"}
+                  </button>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </section>
+  );
+}
+
+export default function Dashboard() {
+  const [eventId, setEventId] = useState(eventOptions[0].id);
+  const [missionId, setMissionId] = useState("");
+  const [missionStatus, setMissionStatus] = useState("ready");
+  const [agentState, setAgentState] = useState(initialAgentState);
+  const [handoff, setHandoff] = useState(null);
+  const [activity, setActivity] = useState([]);
+  const [actions, setActions] = useState([]);
+  const [decisions, setDecisions] = useState({});
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState("");
+  const socketRef = useRef(null);
+
+  const event = eventOptions.find((item) => item.id === eventId) || eventOptions[0];
+  const forecast = result?.agents?.forecast;
+
+  const payload = useMemo(
+    () => ({
+      event_name: event.name,
+      venue: event.venue,
+      mission_goal: event.mission,
+      expected_attendance: event.attendance,
+      venue_capacity: event.capacity,
+      weather_condition: event.weather,
+      time_window: event.timeWindow,
+      incident_data: event.incidents,
+    }),
+    [event],
+  );
+
+  useEffect(() => () => socketRef.current?.close(), []);
+
+  function applyEvent(message) {
+    if (message.type === "mission_started") {
+      setMissionStatus("running");
+      setActivity((prev) => [...prev, { ...message, agent: "coordinator" }]);
+    }
+
+    if (message.type === "agent_running") {
+      setAgentState((prev) => ({
+        ...prev,
+        [message.agent]: { status: "running", thought: message.thought },
+      }));
+    }
+
+    if (message.type === "agent_completed") {
+      setAgentState((prev) => ({
+        ...prev,
+        [message.agent]: { ...prev[message.agent], status: "completed" },
+      }));
+    }
+
+    if (message.type === "agent_failed") {
+      setMissionStatus("failed");
+      setAgentState((prev) => ({
+        ...prev,
+        [message.agent]: { ...prev[message.agent], status: "failed", thought: message.message },
+      }));
+      setError(message.message);
+    }
+
+    if (message.type === "agent_handoff") {
+      setHandoff(message);
+    }
+
+    if (message.type === "activity") {
+      setActivity((prev) => [...prev, message]);
+    }
+
+    if (message.type === "action_generated") {
+      setActions((prev) => {
+        if (prev.some((item) => item.action_index === message.action_index)) return prev;
+        return [...prev, { ...message.action, action_index: message.action_index }];
+      });
+    }
+
+    if (message.type === "mission_completed") {
+      setMissionStatus("completed");
+      setResult(message.result);
+      setHandoff(null);
+    }
+  }
+
+  function connectMissionSocket(nextMissionId) {
+    socketRef.current?.close();
+    const socket = new WebSocket(missionWebSocketUrl(nextMissionId));
+    socketRef.current = socket;
+    socket.onmessage = (eventMessage) => applyEvent(JSON.parse(eventMessage.data));
+    socket.onerror = () => setError("Mission event stream disconnected.");
+  }
+
+  async function executeMission() {
+    setMissionStatus("running");
+    setAgentState(initialAgentState);
+    setHandoff(null);
+    setActivity([]);
+    setActions([]);
+    setDecisions({});
+    setResult(null);
     setError("");
-    const payload = {
-      ...mission,
-      expected_attendance: Number(mission.expected_attendance),
-      venue_capacity: Number(mission.venue_capacity),
-    };
 
     try {
-      const next = await api.coordinate(payload);
-      setResult(next);
-      setMode("live");
+      const started = await api.startMission(payload);
+      setMissionId(started.mission_id);
+      connectMissionSocket(started.mission_id);
     } catch (err) {
-      setResult(fallbackResult);
-      setMode("demo");
-      setError(`Backend unavailable, showing demo execution: ${err.message}`);
-    } finally {
-      setIsRunning(false);
+      setMissionStatus("failed");
+      setError(err.message);
     }
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-950">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-[1500px] flex-col gap-4 px-4 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+    <div className="min-h-screen bg-[#f7f9fc] text-slate-950">
+      <header className="h-16 border-b border-slate-200 bg-white">
+        <div className="mx-auto flex h-full max-w-[1540px] items-center justify-between px-5">
           <div className="flex items-center gap-3">
-            <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-slate-950 text-teal-300">
+            <span className="grid h-10 w-10 place-items-center rounded-md bg-blue-600 text-white">
               <IconRadar className="h-5 w-5" />
             </span>
             <div>
-              <h1 className="text-2xl font-black tracking-tight text-slate-950">CrowdPilot AI</h1>
-              <p className="text-sm text-slate-600">Supervised agent for real-world event operations</p>
+              <h1 className="text-xl font-black tracking-tight">CrowdPilot</h1>
+              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">AI Agent Mission Control</p>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wide">
-            <span className="rounded-full border border-teal-200 bg-teal-50 px-3 py-1 text-teal-800">Gemini agent workflow</span>
-            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-emerald-800">MongoDB MCP track</span>
-            <span className="rounded-full border border-slate-300 bg-slate-50 px-3 py-1 text-slate-700">{mode === "live" ? "Live API" : "Demo fallback"}</span>
+          <div className="flex items-center gap-5">
+            <span className="hidden text-xs font-bold text-slate-500 sm:block">Mission Control</span>
+            <StatusBadge status={missionStatus === "ready" ? "ready" : missionStatus} />
           </div>
         </div>
       </header>
 
-      <main className="mx-auto grid max-w-[1500px] gap-5 px-4 py-5 sm:px-6 lg:grid-cols-[390px_1fr_390px] lg:px-8">
-        <aside className="space-y-5">
-          <Panel title="Mission Brief" icon={IconBuilding}>
-            <div className="space-y-4">
-              <Field label="Event">
-                <input className={inputClass()} value={mission.event_name} onChange={(e) => updateField("event_name", e.target.value)} />
-              </Field>
-              <Field label="Venue">
-                <input className={inputClass()} value={mission.venue} onChange={(e) => updateField("venue", e.target.value)} />
-              </Field>
-              <Field label="Operator goal">
-                <textarea
-                  className={`${inputClass()} min-h-28 resize-none`}
-                  value={mission.mission_goal}
-                  onChange={(e) => updateField("mission_goal", e.target.value)}
-                />
-              </Field>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Attendance">
-                  <input className={inputClass()} type="number" value={mission.expected_attendance} onChange={(e) => updateField("expected_attendance", e.target.value)} />
-                </Field>
-                <Field label="Capacity">
-                  <input className={inputClass()} type="number" value={mission.venue_capacity} onChange={(e) => updateField("venue_capacity", e.target.value)} />
-                </Field>
+      <main className="mx-auto max-w-[1540px] space-y-3 px-5 py-3">
+        <section className="grid items-center gap-4 rounded-lg border border-slate-200 bg-white px-5 py-4 shadow-sm lg:grid-cols-[minmax(0,1fr)_250px_180px]">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-blue-700">Current mission</p>
+            <div className="mt-1 flex flex-wrap items-end gap-x-6 gap-y-2">
+              <div>
+                <select
+                  aria-label="Select Event"
+                  value={eventId}
+                  onChange={(changeEvent) => setEventId(changeEvent.target.value)}
+                  disabled={missionStatus === "running"}
+                  className="max-w-full bg-transparent text-2xl font-black tracking-tight outline-none disabled:opacity-60"
+                >
+                  {eventOptions.map((option) => (
+                    <option key={option.id} value={option.id}>{option.name}</option>
+                  ))}
+                </select>
               </div>
-              <Field label="Weather">
-                <input className={inputClass()} value={mission.weather_condition} onChange={(e) => updateField("weather_condition", e.target.value)} />
-              </Field>
-              <Field label="Peak window">
-                <input className={inputClass()} value={mission.time_window} onChange={(e) => updateField("time_window", e.target.value)} />
-              </Field>
-              <button
-                type="button"
-                onClick={runMission}
-                disabled={isRunning}
-                className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 py-3 text-sm font-bold text-white transition hover:bg-teal-800 disabled:cursor-wait disabled:opacity-70"
-              >
-                <IconPlay className="h-4 w-4" />
-                {isRunning ? "Running agents..." : "Run multi-step mission"}
-              </button>
-              {error && <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">{error}</p>}
-            </div>
-          </Panel>
-
-          <Panel title="Active Incidents" icon={IconAlert}>
-            <div className="space-y-3">
-              {mission.incident_data.map((incident) => (
-                <div key={incident.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-bold text-slate-900">{incident.location}</p>
-                    <RiskBadge level={incident.severity} />
-                  </div>
-                  <p className="mt-2 text-sm text-slate-600">{incident.description}</p>
+              {[
+                ["Venue", event.venue],
+                ["Expected attendance", event.attendance.toLocaleString()],
+                ["Operational focus", event.focus],
+                ["Conditions", event.weather],
+              ].map(([label, value]) => (
+                <div key={label}>
+                  <p className="text-[9px] font-bold uppercase tracking-[0.08em] text-slate-500">{label}</p>
+                  <p className="mt-0.5 text-xs font-black text-slate-950">{value}</p>
                 </div>
               ))}
             </div>
-          </Panel>
-        </aside>
-
-        <section className="space-y-5">
-          <div className="grid gap-4 md:grid-cols-3">
-            <Metric icon={IconUsers} label="Utilization" value={`${utilization}%`} detail={`${Number(mission.expected_attendance).toLocaleString()} expected attendees`} />
-            <Metric icon={IconActivity} label="Staffing" value={resources.recommended_security_staff} detail={`${resources.recommended_traffic_controllers} traffic, ${resources.recommended_medical_staff} medical`} />
-            <Metric icon={IconAlert} label="Risk Level" value={plan.risk_level.toUpperCase()} detail={`${forecast.congestion_zones.length} congestion zones detected`} />
           </div>
 
-          <Panel title="Generated Operation Plan" icon={IconRoute} aside={<RiskBadge level={plan.risk_level} />}>
-            <p className="mb-4 text-sm leading-6 text-slate-600">{plan.mission_summary}</p>
-            <div className="space-y-3">
-              {plan.recommendations.map((item, index) => (
-                <div key={item} className="flex gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white font-mono text-xs font-bold text-teal-700 ring-1 ring-slate-200">
-                    {index + 1}
-                  </span>
-                  <p className="text-sm leading-6 text-slate-800">{item}</p>
-                </div>
-              ))}
+          <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase text-slate-500">Mission status</span>
+              <StatusBadge status={missionStatus} />
             </div>
-          </Panel>
+            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-200">
+              <div
+                className={`h-full rounded-full transition-all ${missionStatus === "completed" ? "w-full bg-emerald-500" : missionStatus === "running" ? "w-2/3 bg-blue-500" : missionStatus === "failed" ? "w-full bg-red-500" : "w-0"}`}
+              />
+            </div>
+          </div>
 
-          <Panel title="Field Actions" icon={IconCheck}>
-            <div className="grid gap-3 md:grid-cols-2">
-              {actions.map((action) => (
-                <div key={`${action.incident_ref}-${action.location}`} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-                  <div className="mb-2 flex items-center justify-between gap-3">
-                    <p className="text-sm font-bold text-slate-950">{action.location}</p>
-                    <RiskBadge level={action.priority} />
-                  </div>
-                  <p className="text-sm leading-6 text-slate-600">{action.action}</p>
-                </div>
-              ))}
-            </div>
-          </Panel>
+          <button
+            type="button"
+            onClick={executeMission}
+            disabled={missionStatus === "running"}
+            className="flex items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-wait disabled:opacity-55"
+          >
+            <IconPlay className="h-4 w-4" />
+            {missionStatus === "running" ? "Mission Running" : "Execute Mission"}
+          </button>
         </section>
 
-        <aside className="space-y-5">
-          <Panel title="Agent Execution" icon={IconRadar}>
-            <div className="space-y-3">
-              {plan.execution_steps.map((step, index) => (
-                <div key={step} className="flex gap-3">
-                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-teal-600 text-xs font-bold text-white">
-                    {index + 1}
-                  </span>
-                  <p className="text-sm leading-6 text-slate-700">{step}</p>
-                </div>
-              ))}
-            </div>
-          </Panel>
+        {error && (
+          <div className="rounded-md border border-red-200 bg-red-50 px-4 py-2 text-xs font-semibold text-red-700">
+            {error}
+          </div>
+        )}
 
-          <Panel title="Partner MCP Trail" icon={IconDatabase}>
-            <div className="space-y-3">
-              {plan.partner_tool_calls.map((call) => (
-                <div key={`${call.tool}-${call.collection}`} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="font-mono text-sm font-bold text-slate-950">{call.tool}</p>
-                    <span className="rounded-full bg-white px-2 py-1 text-[10px] font-bold uppercase text-slate-600 ring-1 ring-slate-200">
-                      {call.status}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-teal-700">{call.mcp_server}</p>
-                  <p className="mt-2 text-sm leading-5 text-slate-600">{call.purpose}</p>
-                  <p className="mt-2 font-mono text-xs text-slate-500">{call.collection}</p>
-                </div>
-              ))}
-            </div>
-          </Panel>
+        <div className="grid gap-3 xl:h-[calc(100vh-224px)] xl:min-h-0 xl:grid-cols-[390px_minmax(0,1fr)_390px]">
+          <div className="grid min-h-0 gap-3 xl:grid-rows-[minmax(0,1fr)_auto]">
+            <AgentPipeline agents={agents} agentState={agentState} handoff={handoff} />
+            <MissionSummary status={missionStatus} agentState={agentState} actions={actions} result={result} />
+          </div>
 
-          <Panel title="Success Metrics" icon={IconActivity}>
-            <ul className="space-y-3">
-              {plan.success_metrics.map((metric) => (
-                <li key={metric} className="flex gap-3 text-sm leading-6 text-slate-700">
-                  <IconCheck className="mt-1 h-4 w-4 shrink-0 text-emerald-600" />
-                  <span>{metric}</span>
-                </li>
-              ))}
-            </ul>
-          </Panel>
-        </aside>
+          <OperationalView forecast={forecast} status={missionStatus} />
+
+          <div className="grid min-h-0 gap-3 xl:grid-rows-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
+            <ActivityFeed items={activity} />
+            <ActionPlans
+              missionId={missionId}
+              actions={actions}
+              decisions={decisions}
+              onDecision={(index, decision) => setDecisions((prev) => ({ ...prev, [index]: decision }))}
+            />
+          </div>
+        </div>
       </main>
     </div>
   );
