@@ -25,11 +25,11 @@ async def get_mission(mission_id: str):
     if mission is None:
         raise HTTPException(status_code=404, detail="Mission not found")
     return {
-        "mission_id": mission.mission_id,
-        "status": mission.status,
-        "events": mission.events,
-        "result": mission.result.model_dump(mode="json") if mission.result else None,
-        "action_decisions": mission.action_decisions,
+    "mission_id": mission.mission_id,
+    "status": mission.status,
+    "events": mission.events,
+    "result": mission.result,
+    "action_decisions": mission.action_decisions,
     }
 
 

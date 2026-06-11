@@ -160,7 +160,10 @@ function StatusBadge({ status }) {
 
 function OperationalView({ forecast, status }) {
   const zones = forecast?.congestion_zones || [];
-  const critical = zones.find((zone) => zone.level === "critical") || zones[0];
+  const critical =  Array.isArray(zones)
+    ? zones[0]
+    : null;
+    <p>{critical || "--"}</p>
   const density = forecast ? Math.round(forecast.utilization_ratio * 100) : 0;
 
   return (
