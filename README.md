@@ -1,6 +1,6 @@
 # CrowdPilot AI
 
-### Operational Intelligence Agents for Large-Scale Event Management
+### Turning Operational Data into Actionable Decisions for Large-Scale Events
 
 CrowdPilot AI is a multi-agent operational planning platform that helps event organizers anticipate crowd risks, retrieve incident response procedures, evaluate available resources, and generate actionable operation plans before problems occur.
 
