@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { IconActivity, IconCheck, IconRadar, IconRoute } from "./icons.jsx";
 
 const statusStyle = {
@@ -26,8 +27,27 @@ const statusStyle = {
 const agentIcons = [IconRadar, IconActivity, IconRoute, IconCheck, IconActivity];
 
 export default function AgentPipeline({ agents, agentState, handoff }) {
+
+  const cardRef = useRef({});
+
+  useEffect(() => {
+    const runningAgent = agents.find(
+      (agent) => agentState[agent.id]?.status === "running"
+    );
+
+    if (
+      runningAgent &&
+      cardRef.current[runningAgent.id]
+    ) {
+      cardRef.current[runningAgent.id].scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }
+  }, [agentState, agents]);
+
   return (
-    <section className="h-full min-h-0 overflow-hidden rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <section className="h-full min-h-0 flex flex-col rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="mb-2 flex items-center justify-between">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-blue-700">Agent topology</p>
@@ -39,7 +59,7 @@ export default function AgentPipeline({ agents, agentState, handoff }) {
         </span>
       </div>
 
-      <div className="space-y-0">
+      <div className="flex-1 overflow-y-auto pr-2 space-y-0">
         {agents.map((agent, index) => {
           const state = agentState[agent.id] || { status: "waiting", thought: agent.thought };
           const style = statusStyle[state.status] || statusStyle.waiting;
@@ -49,21 +69,23 @@ export default function AgentPipeline({ agents, agentState, handoff }) {
 
           return (
             <div key={agent.id}>
-              <div className={`grid grid-cols-[34px_minmax(0,1fr)_minmax(150px,0.9fr)] items-center gap-3 rounded-lg border px-3 py-2 transition ${style.card}`}>
+              <div
+              ref={(el) => (cardRef.current[agent.id] = el)}
+              className={`grid grid-cols-[40px_minmax(0,1.3fr)_150px] gap-3 rounded-lg border px-3 py-3 transition ${style.card}`}>
                 <span className="grid h-8 w-8 place-items-center rounded-md border border-slate-200 bg-white text-slate-700">
                   <AgentIcon className="h-4 w-4" />
                 </span>
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="truncate text-sm font-black text-slate-950">{agent.name}</p>
-                    <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black uppercase ${style.badge}`}>
+                  <div className="flex flex-col items-start gap-1">
+                    <p className="text-sm font-black leading-tight text-slate-950"> {agent.name}</p>
+                    <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-black uppercase ${style.badge}`}>
                       {state.status}
                     </span>
                   </div>
-                  <p className="mt-0.5 truncate text-[11px] text-slate-500">{agent.role}</p>
+                  <p className="mt-1 text-[11px] leading-relaxed text-slate-500">{agent.role}</p>
                 </div>
                 <div className="min-w-0 rounded-md border border-slate-200 bg-white/90 px-2.5 py-2">
-                  <p className="truncate text-[11px] font-semibold text-slate-700">
+                  <p className="text-[11px] leading-relaxed text-slate-700">
                     {state.thought || agent.thought}
                   </p>
                 </div>

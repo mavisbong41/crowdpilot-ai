@@ -145,7 +145,7 @@ function formatTime(timestamp) {
 function StatusBadge({ status }) {
   const styles = {
     ready: "border-slate-200 bg-slate-100 text-slate-600",
-    running: "border-blue-200 bg-blue-50 text-blue-700",
+    running: {dot: "bg-blue-500 animate-pulse",badge: "border-blue-200 bg-blue-50 text-blue-700",card: "border-blue-300 bg-blue-50 animate-pulse",},
     completed: "border-emerald-200 bg-emerald-50 text-emerald-700",
     failed: "border-red-200 bg-red-50 text-red-700",
   };
