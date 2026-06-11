@@ -37,20 +37,12 @@ class MissionRuntime:
 
         self.missions[mission_id] = record
 
-        asyncio.create_task(
-            mongodb_mcp.insert_one(
-                "missions",
-                {
-                    "mission_id": mission_id,
-                    "status": "running",
-                    "created_at": utc_timestamp(),
-                    "payload": payload.model_dump(mode="json"),
-                },
-            )
-        )
-
-        asyncio.create_task(self._run(record))
-
+        from config import settings
+        if settings.demo_mode:
+            asyncio.create_task(self._run_demo(record))
+        else:
+            asyncio.create_task(self._run(record))
+            
         return record
 
     def get(self, mission_id: str) -> MissionRecord | None:
@@ -96,6 +88,148 @@ class MissionRuntime:
         record.events.append(event)
         for queue in list(record.subscribers):
             await queue.put(event)
+
+    async def _run_demo(self, record: MissionRecord) -> None:
+        await self._emit(
+            record,
+            "mission_started",
+            mission_id=record.mission_id,
+            message="Demo mission started."
+        )
+
+        agents = [
+            ("coordinator", "Loading event context..."),
+            ("forecast", "Forecasting crowd density..."),
+            ("incident", "Evaluating incident playbooks..."),
+            ("resource", "Allocating resources..."),
+            ("action", "Generating operation plan...")
+        ]
+
+        for i, (agent, thought) in enumerate(agents):
+            await self._emit(
+                record,
+                "agent_running",
+                agent=agent,
+                thought=thought,
+            )
+
+            await asyncio.sleep(1)
+
+            await self._emit(
+                record,
+                "activity",
+                agent=agent,
+                message=f"{agent} completed analysis."
+            )
+
+            await self._emit(
+                record,
+                "agent_completed",
+                agent=agent,
+            )
+
+            if i < len(agents) - 1:
+                await self._emit(
+                    record,
+                    "agent_handoff",
+                    from_agent=agent,
+                    to_agent=agents[i + 1][0],
+                )
+
+        forecast_json = {
+    "risk_level": "critical",
+    "utilization_ratio": 0.94,
+    "attendance": 80000,
+    "capacity": 88000,
+    "congestion_zones": [
+        {
+            "zone": "Gate A",
+            "level": "critical"
+        },
+        {
+            "zone": "Food Court",
+            "level": "high"
+        },
+        {
+            "zone": "North Concourse",
+            "level": "medium"
+        }
+    ]
+}
+
+        incident_json = {
+            "incident_type": "Crowd Surge",
+            "severity": "High",
+            "probability": 0.87,
+            "location": "Gate A",
+            "required_units": [
+                "Security Staff",
+                "Medical Team",
+            ],
+        }
+
+        resource_json = {
+            "security_staff": 20,
+            "medical_teams": 3,
+            "traffic_controllers": 10,
+            "deployment_zone": "Gate A",
+            "deployment_priority": "High",
+            "deployment_plan": [
+                "Deploy 10 guards to Gate A",
+                "Deploy 10 guards to North Concourse",
+                "Position medical team near food court",
+            ],
+        }
+
+        operation_json = {
+            "mission_name": "World Cup Final Safety Plan",
+            "priority": "High",
+            "objective": "Prevent crowd surge and maintain safe movement.",
+            "actions": [
+                "Open Gate C immediately",
+                "Deploy additional security at Gate A",
+                "Redirect spectators to North Entrance",
+            ],
+            "deployment_summary": [
+                "20 security staff deployed",
+                "3 medical teams activated",
+            ],
+            "success_criteria": [
+                "Density below threshold",
+                "Queue length under 100m",
+            ],
+        }
+
+        for index, action_str in enumerate(operation_json["actions"]):
+            await self._emit(
+                record,
+                "action_generated",
+                action_index=index,
+                action={
+                    "action_id": f"ACT-00{index+1}",
+                    "description": action_str,
+                    "priority": "high",
+                    "confidence": 94,
+                    "impact": "Mitigates congestion.",
+                },
+            )
+
+        record.result = {
+            "agents": {
+                "forecast": forecast_json,
+                "incident": incident_json,
+                "resource": resource_json,
+            },
+            "operation": operation_json,
+        }
+
+        record.status = "completed"
+
+        await self._emit(
+            record,
+            "mission_completed",
+            result=record.result,
+        )
 
     async def _run(self, record: MissionRecord) -> None:
         """
@@ -269,6 +403,8 @@ class MissionRuntime:
             if event["type"] == "agent_running":
                 return event["agent"]
         return "coordinator"
+    
+    
 
 
 mission_runtime = MissionRuntime()

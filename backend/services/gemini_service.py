@@ -7,7 +7,7 @@ from typing import TypeVar
 
 from pydantic import BaseModel, ValidationError
 
-from agents.exceptions import GeminiServiceError
+from adk_agents.exceptions import GeminiServiceError
 from config import settings
 
 logger = logging.getLogger("crowdpilot.gemini")

@@ -157,5 +157,23 @@ class MongoMCPWrapper:
         )
         return result
 
+async def get_resource_template(severity: str):
+    result = await mongodb_mcp_client.call_tool(
+        "find",
+        {
+            "database": "crowdpilot",
+            "collection": "resource_templates",
+            "filter": {
+                "severity": severity
+            }
+        }
+    )
+
+    parsed = _parse_mcp_result(result)
+
+    if not parsed:
+        return None
+
+    return parsed[0]
 
 mongodb_mcp = MongoMCPWrapper()

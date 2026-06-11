@@ -9,7 +9,7 @@ from adk_agents.exceptions import AgentError, GeminiServiceError
 from config import settings
 from logging_config import setup_logging
 from database.connection import close_db, connect_db
-from routes import events, health, incidents, missions, plans
+from routes import events, health, incidents, missions, plans, agents
 
 setup_logging()
 
@@ -65,3 +65,4 @@ app.include_router(events.router, prefix="/api/events", tags=["events"])
 app.include_router(incidents.router, prefix="/api/incidents", tags=["incidents"])
 app.include_router(plans.router, prefix="/api/plans", tags=["operation_plans"])
 app.include_router(missions.router, prefix="/api/mission", tags=["missions"])
+app.include_router(agents.router, prefix="/api/agents", tags=["agents"])

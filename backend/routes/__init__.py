@@ -1,4 +1,9 @@
 """API route modules."""
-from . import agents, events, health, incidents, missions, plans
-
-__all__ = ["agents", "events", "health", "incidents", "missions", "plans"]
+from . import events, health, incidents, missions, plans
+__all__ = [
+    "events",
+    "health",
+    "incidents",
+    "missions",
+    "plans",
+]
