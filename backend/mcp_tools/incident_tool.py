@@ -11,14 +11,12 @@ async def get_playbook_by_incident_type(
         incident_type
     )
 
-    # MCP 返回空
     if not result:
         return {
             "playbook_found": False,
             "incident_type": incident_type
         }
 
-    # MCP 返回结果格式可能是 list
     if isinstance(result, list):
         playbook = result[0]
     else:

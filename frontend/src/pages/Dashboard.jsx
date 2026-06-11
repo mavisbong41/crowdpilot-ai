@@ -100,26 +100,26 @@ const agents = [
   },
   {
     id: "forecast",
-    name: "Crowd Forecast Agent",
-    role: "Crowd flow and density prediction",
+    name: "Forecast Agent",
+    role: "Crowd density prediction",
     thought: "Waiting for coordinator context...",
   },
   {
-    id: "risk",
-    name: "Risk Analysis Agent",
-    role: "Congestion and bottleneck analysis",
+    id: "incident",
+    name: "Incident Agent",
+    role: "Incident classification and playbook analysis",
     thought: "Waiting for forecast results...",
   },
   {
     id: "resource",
     name: "Resource Planner Agent",
-    role: "Security and response allocation",
-    thought: "Waiting for risk analysis...",
+    role: "Resource allocation",
+    thought: "Waiting for incident analysis...",
   },
   {
     id: "action",
-    name: "Action Generation Agent",
-    role: "Approval-ready response plans",
+    name: "Operation Agent",
+    role: "Operational deployment planning",
     thought: "Waiting for resource plan...",
   },
 ];
@@ -164,7 +164,7 @@ function OperationalView({ forecast, status }) {
   const density = forecast ? Math.round(forecast.utilization_ratio * 100) : 0;
 
   return (
-    <section className="h-full min-h-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <section className="h-full min-h-0 overflow-y-auto rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-blue-700">Operational visualization</p>
@@ -230,13 +230,31 @@ function ActivityFeed({ items }) {
             Activity appears here after Execute Mission.
           </div>
         ) : (
-          items.map((item, index) => (
-            <div key={`${item.timestamp}-${index}`} className="grid grid-cols-[70px_120px_minmax(0,1fr)] gap-2 border-b border-slate-100 px-2 py-2.5 text-xs">
-              <span className="font-mono text-blue-700">{formatTime(item.timestamp)}</span>
-              <span className="truncate font-black text-slate-950">{agentLabel[item.agent] || "Mission Control"}</span>
-              <span className="text-slate-600">{item.message}</span>
-            </div>
-          ))
+          items.map((item, index) => {
+            const agentClass =
+              item.agent === "forecast"
+                ? "text-blue-700"
+                : item.agent === "incident"
+                ? "text-red-600"
+                : item.agent === "resource"
+                ? "text-emerald-600"
+                : item.agent === "action"
+                ? "text-purple-600"
+                : "text-slate-950";
+
+            return (
+              <div
+                key={`${item.timestamp}-${index}`}
+                className="grid grid-cols-[70px_120px_minmax(0,1fr)] gap-2 border-b border-slate-100 px-2 py-2.5 text-xs"
+              >
+                <span className="font-mono text-blue-700">{formatTime(item.timestamp)}</span>
+                <span className={`truncate font-black ${agentClass}`}>
+                  {agentLabel[item.agent] || item.agent}
+                </span>
+                <span className="truncate text-slate-600">{item.message}</span>
+              </div>
+            );
+          })
         )}
       </div>
     </section>
@@ -292,17 +310,17 @@ function ActionPlans({ missionId, actions, decisions, onDecision }) {
           actions.map((action, index) => {
             const decision = decisions[index];
             return (
-              <div key={`${action.incident_ref}-${index}`} className="rounded-md border border-slate-200 bg-slate-50 p-3">
+              <div key={action.action_id} className="rounded-md border border-slate-200 bg-slate-50 p-3">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-[10px] font-bold uppercase text-blue-700">Action #{index + 1}</p>
-                    <h3 className="mt-1 text-sm font-black text-slate-950">{action.action}</h3>
+                    <h3 className="mt-1 text-sm font-black text-slate-950">{action.description}</h3>
                   </div>
                   <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[9px] font-black text-emerald-700">
                     {action.confidence}%
                   </span>
                 </div>
-                <p className="mt-2 text-[11px] text-slate-600"><strong>Reason:</strong> {action.location} requires intervention.</p>
+                <p className="mt-2 text-[11px] text-slate-600"><strong>Priority:</strong> {action.priority}</p>
                 <p className="mt-1 text-[11px] text-slate-600"><strong>Impact:</strong> {action.impact}</p>
                 <div className="mt-3 flex gap-2">
                   <button

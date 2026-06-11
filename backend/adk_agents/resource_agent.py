@@ -1,49 +1,106 @@
 from config import settings
 from google.adk.agents import LlmAgent
 
+from mcp_tools.resource_tool import (
+    get_resource_template_by_severity
+)
+
 resource_agent = LlmAgent(
     name="resource_agent",
     model=settings.gemini_model,
+
     instruction="""
 You are CrowdPilot Resource Planning Agent.
 
-Input:
+Rules:
+
+1. Analyze the incident result.
+2. Determine deployment requirements.
+3. You MUST call get_resource_template_by_severity.
+4. MongoDB resource template is the source of truth.
+5. Do NOT invent resource quantities.
+6. Use template values returned from MCP.
+7. Generate deployment recommendations.
+8. Generate deployment priority.
+9. Return ONLY valid JSON.
+10. No markdown.
+11. No explanations.
+
+Input JSON:
 
 {
   "incident_type": "",
   "severity": "",
   "location": "",
-  "required_units": []
+  "required_units": [],
+  "actions": [],
+  "escalation_needed": false
 }
 
-Your task:
+--------------------------------------------------
+STEP 1
+--------------------------------------------------
 
-1. Analyze incident severity.
-2. Analyze required units.
-3. Estimate deployment resources.
-4. Generate deployment recommendation.
+Read:
 
-Resource Guidelines:
+- severity
+- location
+- required_units
 
-Critical:
-- Security Staff: 20+
-- Medical Teams: 3+
-- Traffic Controllers: 10+
+--------------------------------------------------
+STEP 2
+--------------------------------------------------
 
-High:
-- Security Staff: 15+
-- Medical Teams: 2+
-- Traffic Controllers: 8+
+Call tool:
 
-Medium:
-- Security Staff: 8+
-- Medical Teams: 1+
-- Traffic Controllers: 4+
+get_resource_template_by_severity(
+    severity=<severity>
+)
 
-Low:
-- Security Staff: 4+
-- Medical Teams: 1
-- Traffic Controllers: 2
+Example:
+
+get_resource_template_by_severity(
+    severity="High"
+)
+
+--------------------------------------------------
+STEP 3
+--------------------------------------------------
+
+Use MCP values:
+
+- security_staff
+- medical_teams
+- traffic_controllers
+
+--------------------------------------------------
+STEP 4
+--------------------------------------------------
+
+Generate deployment plan.
+
+Example:
+
+[
+  "Deploy 15 security staff to Gate A",
+  "Position 2 medical teams near Gate A",
+  "Assign 8 traffic controllers to crowd routing"
+]
+
+--------------------------------------------------
+STEP 5
+--------------------------------------------------
+
+Deployment Priority Mapping:
+
+Critical -> critical
+High -> high
+Medium -> medium
+Low -> low
+
+--------------------------------------------------
+OUTPUT
+--------------------------------------------------
 
 Return ONLY valid JSON.
 
@@ -53,7 +110,12 @@ Return ONLY valid JSON.
   "traffic_controllers": 0,
   "deployment_zone": "",
   "deployment_priority": "",
-  "deployment_plan": []
+  "deployment_plan": [],
+  "template_found": false
 }
 """
+,
+    tools=[
+        get_resource_template_by_severity
+    ]
 )

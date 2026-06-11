@@ -236,14 +236,10 @@ class MissionRuntime:
 
             for index, action_str in enumerate(operation_json.get("actions", [])):
                 await self._emit(
-                    record, "action_generated", action_index=index,
-                    action={
-                        "action_id": f"ACT-00{index+1}",
-                        "description": action_str,
-                        "priority": operation_json.get("priority", "medium"),
-                        "confidence": 94,
-                        "impact": "Mitigates critical congestion layer."
-                    }
+                    record,
+                    "action_generated",
+                    action_index=index,
+                    action=action
                 )
 
             await self._emit(record, "activity", agent="action", message="Deployment plan saved to system of record via MongoDB MCP.")

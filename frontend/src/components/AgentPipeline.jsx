@@ -47,7 +47,7 @@ export default function AgentPipeline({ agents, agentState, handoff }) {
   }, [agentState, agents]);
 
   return (
-    <section className="h-full min-h-0 flex flex-col rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <section className="h-full min-h-0 overflow-y-auto flex flex-col rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="mb-2 flex items-center justify-between">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-blue-700">Agent topology</p>
