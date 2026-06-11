@@ -16,7 +16,7 @@ class Settings(BaseSettings):
 
     # Gemini
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.0-flash"
+    gemini_model: str = "gemini-2.0-flash" 
     gemini_temperature: float = 0.2
     agents_use_gemini: bool = True
     agent_fallback_to_rules: bool = True

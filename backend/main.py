@@ -5,11 +5,11 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from agents.exceptions import AgentError, GeminiServiceError
+from adk_agents.exceptions import AgentError, GeminiServiceError
 from config import settings
 from logging_config import setup_logging
 from database.connection import close_db, connect_db
-from routes import agents, events, health, incidents, missions, plans
+from routes import events, health, incidents, missions, plans
 
 setup_logging()
 
@@ -17,6 +17,8 @@ setup_logging()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await connect_db()
+    from mcp_tools.mongodb_mcp_client import mongodb_mcp_client
+    await mongodb_mcp_client.connect()
     yield
     await close_db()
 
@@ -62,5 +64,4 @@ app.include_router(health.router, prefix="/api", tags=["health"])
 app.include_router(events.router, prefix="/api/events", tags=["events"])
 app.include_router(incidents.router, prefix="/api/incidents", tags=["incidents"])
 app.include_router(plans.router, prefix="/api/plans", tags=["operation_plans"])
-app.include_router(agents.router, prefix="/api/agents", tags=["agents"])
 app.include_router(missions.router, prefix="/api/mission", tags=["missions"])

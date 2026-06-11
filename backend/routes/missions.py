@@ -3,7 +3,7 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 
-from agents.schemas import CoordinatorInput
+from models.mission import CoordinatorInput
 from services.mission_runtime import mission_runtime
 
 router = APIRouter()

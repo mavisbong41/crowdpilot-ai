@@ -3,6 +3,13 @@ from typing import Any
 from bson import ObjectId
 from bson.errors import InvalidId
 
+from motor.motor_asyncio import AsyncIOMotorClient
+client = AsyncIOMotorClient(
+    "mongodb://localhost:27017"
+)
+
+db = client["crowdpilot"]
+
 
 def parse_object_id(value: str) -> ObjectId | None:
     try:
