@@ -2,9 +2,11 @@
 
 ### Turning Operational Data into Actionable Decisions for Large-Scale Events
 
-CrowdPilot AI is a multi-agent operational planning platform that helps event organizers anticipate crowd risks, retrieve incident response procedures, evaluate available resources, and generate actionable operation plans before problems occur.
+CrowdPilot AI is a multi-agent operational intelligence platform that helps event operators transform fragmented operational data into real-time decisions.
 
-Built for the Google Cloud Rapid Agent Hackathon, CrowdPilot demonstrates how Gemini-powered agents can move beyond answering questions and actively support operational decision-making through MongoDB-powered intelligence retrieval.
+Using Gemini 3, Google ADK, and MongoDB MCP, CrowdPilot retrieves historical incidents, response playbooks, resource inventories, and operational knowledge directly from MongoDB Atlas to generate actionable event operation plans.
+
+Rather than functioning as a chatbot, CrowdPilot acts as an operational co-pilot that assists organizers in anticipating risks, allocating resources, and preparing responses before incidents occur.
 
 ---
 
