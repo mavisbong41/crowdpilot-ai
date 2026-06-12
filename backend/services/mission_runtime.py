@@ -7,7 +7,7 @@ from uuid import uuid4
 from models.mission import CoordinatorInput
 from mcp_tools.mongodb_tool import mongodb_mcp
 from google.adk.sessions import InMemorySessionService
-
+from google.genai import types
 
 def utc_timestamp() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -279,7 +279,16 @@ class MissionRuntime:
                 app_name="crowdpilot",
                 session_service=self.session_service,
             )
-            forecast_prompt = json.dumps(record.payload.model_dump(mode="json"))
+            forecast_prompt = types.Content(
+                role="user",
+                parts=[
+                    types.Part(
+                        text=json.dumps(
+                            record.payload.model_dump(mode="json")
+                        )
+                    )
+                ]
+            )
 
             forecast_response = ""
             async for event in forecast_runner.run_async(user_id="crowdpilot", session_id=session.id, new_message=forecast_prompt):
@@ -304,7 +313,14 @@ class MissionRuntime:
                 app_name="crowdpilot",
                 session_service=self.session_service,
             )
-            incident_prompt = json.dumps(forecast_json)
+            incident_prompt = types.Content(
+                role="user",
+                parts=[
+                    types.Part(
+                        text=json.dumps(forecast_json)
+                    )
+                ]
+            )
 
             incident_response = ""
             async for event in incident_runner.run_async(user_id="crowdpilot", session_id=session.id, new_message=incident_prompt):
@@ -328,7 +344,14 @@ class MissionRuntime:
                 app_name="crowdpilot",
                 session_service=self.session_service,
             )
-            resource_prompt = json.dumps(incident_json)
+            resource_prompt = types.Content(
+                role="user",
+                parts=[
+                    types.Part(
+                        text=json.dumps(incident_json)
+                    )
+                ]
+            )
 
             resource_response = ""
             async for event in resource_runner.run_async(user_id="crowdpilot", session_id=session.id, new_message=resource_prompt):
@@ -360,7 +383,7 @@ class MissionRuntime:
             }
 
             operation_response = ""
-            async for event in operation_runner.run_async(user_id="crowdpilot", session_id=session.id, new_message=json.dumps(combined_context)):
+            async for event in operation_runner.run_async(user_id="crowdpilot", session_id=session.id, new_message=types.Content(role="user",parts=[types.Part(text=json.dumps(combined_context))])):
                 if event.is_final_response():
                     operation_response = event.content.parts[0].text
                     break
