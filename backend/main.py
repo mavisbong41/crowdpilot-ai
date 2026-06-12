@@ -17,11 +17,8 @@ setup_logging()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await connect_db()
-    from mcp_tools.mongodb_mcp_client import mongodb_mcp_client
-    await mongodb_mcp_client.connect()
     yield
     await close_db()
-
 
 app = FastAPI(
     title="CrowdPilot AI",
