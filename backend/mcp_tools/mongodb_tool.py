@@ -9,14 +9,6 @@ from mcp_tools.mongodb_mcp_client import mongodb_mcp_client
 # ==========================
 
 def _parse_mcp_result(result) -> list:
-    """
-    Extract JSON documents from a CallToolResult.
-
-    The MongoDB MCP server wraps its response text in
-    <untrusted-user-data-...> tags.  This helper unwraps them and
-    returns a plain Python list so ADK agents receive a JSON-
-    serialisable value (not a CallToolResult object).
-    """
     if not hasattr(result, "content") or not result.content:
         return []
 
@@ -25,13 +17,14 @@ def _parse_mcp_result(result) -> list:
         if not text:
             continue
 
-        # Strip untrusted-user-data wrapper tags when present
         match = re.search(
-            r"<untrusted-user-data-[^>]+>\s*(.*?)\s*</untrusted-user-data-[^>]+>",
+            r"<untrusted-user-data-[^>]+>\s*(\[.*?\])\s*</untrusted-user-data-[^>]+>",
             text,
-            re.DOTALL,
+            re.DOTALL
         )
-        json_str = match.group(1) if match else text
+        json_str = match.group(1) if match else None
+        if not json_str:
+            continue
 
         try:
             data = json.loads(json_str)
@@ -131,7 +124,13 @@ class MongoMCPWrapper:
                 "filter": filter or {},
             },
         )
-        return _parse_mcp_result(result)
+        print("\n===== RAW MCP RESULT =====")
+        print(result)
+        parsed = _parse_mcp_result(result)
+        print("===== PARSED =====")
+        print(parsed)
+        print("====================\n")
+        return parsed
 
     async def insert_one(self, collection: str, document: dict):
         result = await mongodb_mcp_client.call_tool(

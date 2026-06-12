@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
-
+from config import settings
 from models.mission import CoordinatorInput
 from mcp_tools.mongodb_tool import mongodb_mcp
 from google.adk.sessions import InMemorySessionService
@@ -29,21 +29,18 @@ class MissionRuntime:
         self.missions: dict[str, MissionRecord] = {}
         self.session_service = InMemorySessionService()
 
-    def create(self, payload: CoordinatorInput) -> MissionRecord:
+    async def create(self, payload: CoordinatorInput) -> MissionRecord:
         mission_id = uuid4().hex
-
         record = MissionRecord(
             mission_id=mission_id,
             payload=payload,
         )
-
         self.missions[mission_id] = record
-
-        from config import settings
+        
         if settings.demo_mode:
-            asyncio.create_task(self._run_demo(record))
+            await self._run_demo(record)
         else:
-            asyncio.create_task(self._run(record))
+            await self._run(record)
             
         return record
 
@@ -258,43 +255,45 @@ class MissionRuntime:
             await self._emit(record, "agent_running", agent="coordinator", thought="Analyzing operational context...")
 
             historical_events = await mongodb_mcp.find("events", {})
+            print("STEP 1")
             await self._emit(
                 record,
                 "activity",
                 agent="coordinator",
                 message=f"Loaded {len(historical_events)} historical events from MongoDB MCP for pattern comparison."
             )
+            print("STEP 2")
             await self._emit(record, "agent_completed", agent="coordinator")
+            print("STEP 3")
             await self._emit(record, "agent_handoff", from_agent="coordinator", to_agent="forecast")
-
+            print("STEP 4")
             await self._emit(record, "agent_running", agent="forecast", thought="Invoking Forecast Agent for crowd density analysis...")
             
-            session = await self.session_service.create_session(
+            record.session = await self.session_service.create_session(
                 app_name="crowdpilot",
-                user_id=record.mission_id,
+                user_id="crowdpilot",
             )
+            print(f"[SESSION CREATED] {record.session.id}")
 
             forecast_runner = Runner(
                 agent=forecast_agent,
                 app_name="crowdpilot",
-                session_service=self.session_service,
+                session_service=self.session_service
             )
             forecast_prompt = types.Content(
                 role="user",
-                parts=[
-                    types.Part(
-                        text=json.dumps(
-                            record.payload.model_dump(mode="json")
-                        )
-                    )
-                ]
-            )
-
+                parts=[types.Part(text=json.dumps(record.payload.model_dump(mode="json")))])
+            
+            print(f"[FORECAST RUNNER] using session.id = {record.session.id}")
+            
             forecast_response = ""
-            async for event in forecast_runner.run_async(user_id="crowdpilot", session_id=session.id, new_message=forecast_prompt):
+            async for event in forecast_runner.run_async(user_id="crowdpilot", session_id=record.session.id, new_message=forecast_prompt):
                 if event.is_final_response():
-                    forecast_response = event.content.parts[0].text
-                    break
+                    if event.content and hasattr(event.content, 'parts') and event.content.parts:
+                        forecast_response = event.content.parts[0].text or ""
+                    
+            if not forecast_response.strip():
+                raise RuntimeError("Forecast Agent returned an empty response (likely 429 Rate Limit).")
 
             try:
                 clean = forecast_response.strip().replace("```json", "").replace("```", "").strip()
@@ -305,7 +304,10 @@ class MissionRuntime:
             await self._emit(record, "activity", agent="forecast", message=f"Risk assessment concluded: {forecast_json.get('risk_level', 'unknown')} risk layer generated.")
             await self._emit(record, "agent_completed", agent="forecast", output=forecast_json)
             await self._emit(record, "agent_handoff", from_agent="forecast", to_agent="incident")
-
+            
+            print("[RATE LIMIT PROTECTION] waiting 15 seconds...")
+            await asyncio.sleep(15)
+            
             await self._emit(record, "agent_running", agent="incident", thought="Evaluating risks against MongoDB playbooks...")
 
             incident_runner = Runner(
@@ -321,13 +323,17 @@ class MissionRuntime:
                     )
                 ]
             )
+            print(f"[INCIDENT RUNNER] using session.id = {record.session.id}")
 
             incident_response = ""
-            async for event in incident_runner.run_async(user_id="crowdpilot", session_id=session.id, new_message=incident_prompt):
+            async for event in incident_runner.run_async(user_id="crowdpilot", session_id=record.session.id, new_message=incident_prompt):
                 if event.is_final_response():
-                    incident_response = event.content.parts[0].text
-                    break
-
+                    if event.content and hasattr(event.content, 'parts') and event.content.parts:
+                        incident_response = event.content.parts[0].text or ""
+                    
+            if not incident_response.strip():
+                raise RuntimeError("Incident Agent returned an empty response (likely 429 Rate Limit).")
+                    
             try:
                 clean = incident_response.strip().replace("```json", "").replace("```", "").strip()
                 incident_json = json.loads(clean)
@@ -337,6 +343,10 @@ class MissionRuntime:
             await self._emit(record, "activity", agent="incident", message=f"Incident pattern classified: {incident_json.get('incident_type', 'None')}. Playbook verification successful.")
             await self._emit(record, "agent_completed", agent="incident", output=incident_json)
             await self._emit(record, "agent_handoff", from_agent="incident", to_agent="resource")
+            
+            print("[RATE LIMIT PROTECTION] waiting 15 seconds...")
+            await asyncio.sleep(15)
+            
             await self._emit(record, "agent_running", agent="resource", thought="Calculating security and medical assets...")
 
             resource_runner = Runner(
@@ -352,12 +362,16 @@ class MissionRuntime:
                     )
                 ]
             )
+            print(f"[RESOURCE RUNNER] using session.id = {record.session.id}")
 
             resource_response = ""
-            async for event in resource_runner.run_async(user_id="crowdpilot", session_id=session.id, new_message=resource_prompt):
+            async for event in resource_runner.run_async(user_id="crowdpilot", session_id=record.session.id, new_message=resource_prompt):
                 if event.is_final_response():
-                    resource_response = event.content.parts[0].text
-                    break
+                    if event.content and hasattr(event.content, 'parts') and event.content.parts:
+                        resource_response = event.content.parts[0].text or ""
+                    
+            if not resource_response.strip():
+                raise RuntimeError("Resource Agent returned an empty response (likely 429 Rate Limit).")
 
             try:
                 clean = resource_response.strip().replace("```json", "").replace("```", "").strip()
@@ -369,6 +383,9 @@ class MissionRuntime:
             await self._emit(record, "agent_completed", agent="resource", output=resource_json)
             await self._emit(record, "agent_handoff", from_agent="resource", to_agent="action")
 
+            print("[RATE LIMIT PROTECTION] waiting 15 seconds...")
+            await asyncio.sleep(15)
+            
             await self._emit(record, "agent_running", agent="action", thought="Compiling final operational deployment plan...")
 
             operation_runner = Runner(
@@ -381,12 +398,20 @@ class MissionRuntime:
                 "incident": incident_json,
                 "resource": resource_json
             }
+            operation_prompt = types.Content(
+                role="user",
+                parts=[types.Part(text=json.dumps(combined_context))]
+                )
+            print(f"[OPERATION RUNNER] using session.id = {record.session.id}")
 
             operation_response = ""
-            async for event in operation_runner.run_async(user_id="crowdpilot", session_id=session.id, new_message=types.Content(role="user",parts=[types.Part(text=json.dumps(combined_context))])):
+            async for event in operation_runner.run_async(user_id="crowdpilot", session_id=record.session.id, new_message=operation_prompt):
                 if event.is_final_response():
-                    operation_response = event.content.parts[0].text
-                    break
+                    if event.content and hasattr(event.content, 'parts') and event.content.parts:
+                        operation_response = event.content.parts[0].text or ""
+                    
+            if not operation_response.strip():
+                raise RuntimeError("Operation Agent returned an empty response (likely 429 Rate Limit).")
 
             try:
                 clean = operation_response.strip().replace("```json", "").replace("```", "").strip()
@@ -440,9 +465,20 @@ class MissionRuntime:
             )
 
         except Exception as exc:
+            import traceback
+            print("\n========== FULL ERROR ==========")
+            traceback.print_exc()
+            print("ERROR:", exc)
+            print("================================\n")
+            
             record.status = "failed"
-            await self._emit(record, "agent_failed", agent=self._current_agent(record), message=str(exc))
-
+            await self._emit(
+                record,
+                "agent_failed",
+                agent=self._current_agent(record),
+                message=str(exc)
+                )
+            
     @staticmethod
     def _current_agent(record: MissionRecord) -> str:
         for event in reversed(record.events):
