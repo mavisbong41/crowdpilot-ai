@@ -232,14 +232,15 @@ crowdpilot-ai/
 
 **Important for Judges & Reviewers**
 
-The hosted deployment is currently running on a free Render instance (512MB RAM).  
+The hosted deployment now runs in **Production Mode**, using real **Gemini 3 Flash Preview** reasoning (`gemini-3-flash-preview`) and live MongoDB MCP integration.
 
-- Due to memory limitations, the hosted project runs in **Demo Mode** to ensure the full mission pipeline completes.  
-- All agents (Coordinator, Forecast, Incident, Resource, Operation) execute in demo mode with mocked data.  
-- The submitted demo video demonstrates the full production workflow, including real Gemini reasoning and MCP integration.  
-- The repository contains the complete production implementation that works with real MCP and Gemini 3 on higher-memory instances.  
+- All agents (Coordinator, Forecast, Incident, Resource, Operation) operate on real operational data rather than mocked data.  
+- **API quota limitations:** Gemini 3 Flash Preview requests are subject to rate limits and current API key quota. Very large or concurrent missions may fail or pause midway if the quota is exceeded.  
+- To mitigate issues, the system may queue operations or gracefully handle API errors, but some actions (especially later stages like the Operation Planning Agent) may not complete if the API limit is hit.  
+- For uninterrupted full production runs, upgrading your API plan or running on higher-memory instances is recommended.  
+- Reviewers should be aware that partial runs due to quota limits are expected and part of normal operation under restricted API usage.  
 
-This ensures that reviewers can interact with the hosted project reliably without encountering memory-related failures.
+This ensures that reviewers understand the system is fully functional in production, but may be **rate-limited or temporarily blocked** due to API constraints.
 
 ---
 
