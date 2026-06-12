@@ -2,11 +2,18 @@
 
 ### Turning Operational Data into Actionable Decisions for Large-Scale Events
 
-CrowdPilot AI is a multi-agent operational intelligence platform that helps event operators transform fragmented operational data into real-time decisions.
+## Table of Contents
 
-Using Gemini 3, Google ADK, and MongoDB MCP, CrowdPilot retrieves historical incidents, response playbooks, resource inventories, and operational knowledge directly from MongoDB Atlas to generate actionable event operation plans.
-
-Rather than functioning as a chatbot, CrowdPilot acts as an operational co-pilot that assists organizers in anticipating risks, allocating resources, and preparing responses before incidents occur.
+- [Problem](#problem)
+- [Architecture](#architecture)
+- [Multi-Agent Workflow](#multi-agent-workflow)
+- [MongoDB MCP Integration](#mongodb-mcp-integration)
+- [Technology Stack](#technology-stack)
+- [Project Structure](#project-structure)
+- [Example Operational Scenario](#example-operational-scenario)
+- [Hosted Project Notice](#hosted-project-notice)
+- [Why CrowdPilot AI](#why-crowdpilot-ai)
+- [License](#license)
 
 ---
 
@@ -82,8 +89,6 @@ Outputs:
 - Congestion prediction
 - Monitoring recommendations
 
----
-
 ### Incident Agent
 
 Retrieves operational response procedures from MongoDB Atlas.
@@ -94,8 +99,6 @@ Outputs:
 - Escalation procedures
 - Emergency actions
 
----
-
 ### Resource Agent
 
 Analyzes available operational resources.
@@ -105,8 +108,6 @@ Outputs:
 - Staffing recommendations
 - Equipment allocation
 - Coverage analysis
-
----
 
 ### Operation Planning Agent
 
@@ -145,32 +146,34 @@ This enables:
 
 ### AI & Agents
 
-- google-gemini-3
-- google-adk
-- model-context-protocol
-- mongodb-mcp-server
+- Gemini 3
+- Google ADK
+- Model Context Protocol (MCP)
+- MongoDB MCP Server
 
 ### Backend
 
-- python
-- fastapi
-- pydantic
-- motor
+- Python
+- FastAPI
+- Pydantic
+- Motor
 
 ### Database
 
-- mongodb-atlas
+- MongoDB Atlas
 
 ### Frontend
 
-- react
-- vite
-- tailwindcss
+- React
+- Vite
+- Tailwind CSS
 
-### Cloud
+### Cloud & Deployment
 
-- google-cloud-run
-- google-container-registry
+- Render
+- Vercel
+- MongoDB Atlas
+- Google Cloud
 
 ---
 
@@ -202,12 +205,12 @@ crowdpilot-ai/
 
 ## Example Operational Scenario
 
-Input:
+### Input
 
 - Event Attendance: 18,000
 - Venue Capacity: 20,000
 
-CrowdPilot AI will:
+### CrowdPilot AI Will
 
 1. Assess crowd risk
 2. Retrieve similar historical events
@@ -215,13 +218,28 @@ CrowdPilot AI will:
 4. Retrieve emergency playbooks
 5. Generate deployment recommendations
 
-Output:
+### Output
 
 - Risk level
 - Monitoring zones
 - Staffing plan
 - Resource allocation
 - Incident response guidance
+
+---
+
+## Hosted Project Notice
+
+**Important for Judges & Reviewers**
+
+The hosted deployment is currently running on a free Render instance (512MB RAM).  
+
+- Due to memory limitations, the hosted project runs in **Demo Mode** to ensure the full mission pipeline completes.  
+- All agents (Coordinator, Forecast, Incident, Resource, Operation) execute in demo mode with mocked data.  
+- The submitted demo video demonstrates the full production workflow, including real Gemini reasoning and MCP integration.  
+- The repository contains the complete production implementation that works with real MCP and Gemini 3 on higher-memory instances.  
+
+This ensures that reviewers can interact with the hosted project reliably without encountering memory-related failures.
 
 ---
 
@@ -232,6 +250,8 @@ Most AI systems answer questions.
 CrowdPilot helps operators make decisions.
 
 By combining Gemini reasoning with MongoDB operational intelligence through MCP, CrowdPilot demonstrates how AI agents can support real-world operational planning rather than simply generating text.
+
+The platform focuses on turning operational data into actionable decisions, helping event operators respond faster, allocate resources more effectively, and proactively manage risks before incidents occur.
 
 ---
 
