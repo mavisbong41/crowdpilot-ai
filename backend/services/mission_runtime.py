@@ -6,6 +6,7 @@ from uuid import uuid4
 
 from models.mission import CoordinatorInput
 from mcp_tools.mongodb_tool import mongodb_mcp
+from google.adk.sessions import InMemorySessionService
 
 
 def utc_timestamp() -> str:
@@ -26,6 +27,7 @@ class MissionRecord:
 class MissionRuntime:
     def __init__(self) -> None:
         self.missions: dict[str, MissionRecord] = {}
+        self.session_service = InMemorySessionService()
 
     def create(self, payload: CoordinatorInput) -> MissionRecord:
         mission_id = uuid4().hex
@@ -266,12 +268,21 @@ class MissionRuntime:
             await self._emit(record, "agent_handoff", from_agent="coordinator", to_agent="forecast")
 
             await self._emit(record, "agent_running", agent="forecast", thought="Invoking Forecast Agent for crowd density analysis...")
+            
+            session = await self.session_service.create_session(
+                app_name="crowdpilot",
+                user_id=record.mission_id,
+            )
 
-            forecast_runner = Runner(agent=forecast_agent)
+            forecast_runner = Runner(
+                agent=forecast_agent,
+                app_name="crowdpilot",
+                session_service=self.session_service,
+            )
             forecast_prompt = json.dumps(record.payload.model_dump(mode="json"))
 
             forecast_response = ""
-            async for event in forecast_runner.run_async(user_id="crowdpilot", session_id=record.mission_id, new_message=forecast_prompt):
+            async for event in forecast_runner.run_async(user_id="crowdpilot", session_id=session.id, new_message=forecast_prompt):
                 if event.is_final_response():
                     forecast_response = event.content.parts[0].text
                     break
@@ -288,11 +299,15 @@ class MissionRuntime:
 
             await self._emit(record, "agent_running", agent="incident", thought="Evaluating risks against MongoDB playbooks...")
 
-            incident_runner = Runner(agent=incident_agent)
+            incident_runner = Runner(
+                agent=incident_agent,
+                app_name="crowdpilot",
+                session_service=self.session_service,
+            )
             incident_prompt = json.dumps(forecast_json)
 
             incident_response = ""
-            async for event in incident_runner.run_async(user_id="crowdpilot", session_id=record.mission_id, new_message=incident_prompt):
+            async for event in incident_runner.run_async(user_id="crowdpilot", session_id=session.id, new_message=incident_prompt):
                 if event.is_final_response():
                     incident_response = event.content.parts[0].text
                     break
@@ -308,11 +323,15 @@ class MissionRuntime:
             await self._emit(record, "agent_handoff", from_agent="incident", to_agent="resource")
             await self._emit(record, "agent_running", agent="resource", thought="Calculating security and medical assets...")
 
-            resource_runner = Runner(agent=resource_agent)
+            resource_runner = Runner(
+                agent=resource_agent,
+                app_name="crowdpilot",
+                session_service=self.session_service,
+            )
             resource_prompt = json.dumps(incident_json)
 
             resource_response = ""
-            async for event in resource_runner.run_async(user_id="crowdpilot", session_id=record.mission_id, new_message=resource_prompt):
+            async for event in resource_runner.run_async(user_id="crowdpilot", session_id=session.id, new_message=resource_prompt):
                 if event.is_final_response():
                     resource_response = event.content.parts[0].text
                     break
@@ -329,7 +348,11 @@ class MissionRuntime:
 
             await self._emit(record, "agent_running", agent="action", thought="Compiling final operational deployment plan...")
 
-            operation_runner = Runner(agent=operation_agent)
+            operation_runner = Runner(
+                agent=operation_agent,
+                app_name="crowdpilot",
+                session_service=self.session_service,
+            )
             combined_context = {
                 "forecast": forecast_json,
                 "incident": incident_json,
@@ -337,7 +360,7 @@ class MissionRuntime:
             }
 
             operation_response = ""
-            async for event in operation_runner.run_async(user_id="crowdpilot", session_id=record.mission_id, new_message=json.dumps(combined_context)):
+            async for event in operation_runner.run_async(user_id="crowdpilot", session_id=session.id, new_message=json.dumps(combined_context)):
                 if event.is_final_response():
                     operation_response = event.content.parts[0].text
                     break
